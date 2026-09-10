@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>WLOC 选点</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Ctext y='26' font-size='26'%3E%F0%9F%93%8D%3C/text%3E%3C/svg%3E">
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css">
+<style>
+:root{
+  --bg:#f5f5f7; --card:#fff; --fg:#1d1d1f; --muted:#6e6e73; --line:#e3e3e6;
+  --accent:#0071e3; --ok:#1a9c4b; --warn:#c2410c; --danger:#d92c20;
+}
+@media (prefers-color-scheme:dark){
+  :root{--bg:#000; --card:#1c1c1e; --fg:#f5f5f7; --muted:#98989d; --line:#2c2c2e; --accent:#0a84ff;}
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--fg);
+  font:15px/1.5 -apple-system,BlinkMacSystemFont,"PingFang SC","Hiragino Sans GB","Microsoft YaHei",sans-serif}
+#map{height:46vh;min-height:280px;width:100%}
+.wrap{max-width:640px;margin:0 auto;padding:12px 16px 40px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:14px;margin:12px 0}
+h2{font-size:13px;font-weight:600;color:var(--muted);margin:0 0 10px;letter-spacing:.04em}
+.row{display:flex;gap:8px;flex-wrap:wrap}
+.row>*{flex:1 1 0;min-width:0}
+input,button,select{font:inherit;border-radius:10px;border:1px solid var(--line);padding:10px 12px;
+  background:var(--card);color:var(--fg);width:100%}
+input[readonly]{background:var(--bg);color:var(--muted)}
+button{cursor:pointer;border:none;background:var(--bg);font-weight:500}
+button.primary{background:var(--accent);color:#fff}
+button.danger{background:var(--danger);color:#fff}
+button:active{opacity:.7}
+.hint{font-size:12px;color:var(--muted);margin-top:8px}
+.pill{display:inline-block;font-size:12px;padding:3px 9px;border-radius:99px;background:var(--bg);color:var(--muted)}
+.pill.ok{background:rgba(26,156,75,.14);color:var(--ok)}
+.pill.bad{background:rgba(217,44,32,.12);color:var(--danger)}
+.out{font:12px/1.6 ui-monospace,SFMono-Regular,Menlo,monospace;color:var(--muted);
+  word-break:break-all;white-space:pre-wrap;margin-top:10px}
+.layers{position:absolute;top:10px;right:10px;z-index:500;display:flex;gap:4px;
+  background:var(--card);border-radius:10px;padding:4px;box-shadow:0 1px 6px rgba(0,0,0,.2)}
+.layers button{padding:5px 10px;font-size:12px;border-radius:7px;width:auto;flex:none}
+.layers button.on{background:var(--accent);color:#fff}
+.maprel{position:relative}
+.fav{display:flex;align-items:center;gap:8px;padding:8px 0;border-bottom:1px solid var(--line)}
+.fav:last-child{border-bottom:none}
+.fav span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
+.fav button{width:auto;flex:none;padding:6px 10px;font-size:12px}
+</style>
+</head>
+<body>
+
+<div class="maprel">
+  <div id="map"></div>
+  <div class="layers">
+    <button data-layer="osm" class="on">标准</button>
+    <button data-layer="sat">卫星</button>
+    <button data-layer="gaode">高德</button>
+  </div>
+</div>
+
+<div class="wrap">
+
+  <div class="card">
+    <h2>目标坐标 <span id="status" class="pill">检测中…</span></h2>
+    <div class="row">
+      <input id="lat" placeholder="纬度 latitude" inputmode="decimal">
+      <input id="lon" placeholder="经度 longitude" inputmode="decimal">
+    </div>
+    <div class="row" style="margin-top:8px">
+      <input id="acc" placeholder="精度(米)" inputmode="numeric" value="25">
+      <input id="rnd" placeholder="扰动半径(米)" inputmode="numeric" value="0">
+    </div>
+    <div class="row" style="margin-top:10px">
+      <button class="primary" id="save">储存到设备</button>
+      <button id="star">收藏</button>
+    </div>
+    <div class="row" style="margin-top:8px">
+      <button id="query">查询当前</button>
+      <button class="danger" id="clear">恢复真实定位</button>
+    </div>
+    <div class="out" id="out">点地图选点，或直接填经纬度。</div>
+  </div>
+
+  <div class="card">
+    <h2>搜索 / 粘贴</h2>
+    <div class="row">
+      <input id="q" placeholder="地名，或 35.6586,139.7454">
+      <button id="go" style="flex:0 0 72px">走</button>
+    </div>
+    <div class="hint">地名搜索直连 OpenStreetMap Nominatim。坐标文本按「纬度,经度」解析。</div>
+  </div>
+
+  <div class="card">
+    <h2>收藏</h2>
+    <div id="favs"></div>
+  </div>
+
+  <div class="hint" style="text-align:center">
+    需要先在小火箭里启用 wloc 模块并开启 HTTPS 解密。<br>
+    改完坐标要关开一次定位服务；iOS 26+ 需重启设备清缓存。
+  </div>
+</div>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+// ---------- GCJ-02 <-> WGS-84 ----------
+const PI=Math.PI, A=6378245.0, EE=0.00669342162296594323;
+const outOfChina=(lat,lon)=>!(lon>73.66&&lon<135.05&&lat>3.86&&lat<53.55);
+function tLat(x,y){let r=-100+2*x+3*y+.2*y*y+.1*x*y+.2*Math.sqrt(Math.abs(x));
+  r+=(20*Math.sin(6*x*PI)+20*Math.sin(2*x*PI))*2/3;
+  r+=(20*Math.sin(y*PI)+40*Math.sin(y/3*PI))*2/3;
+  r+=(160*Math.sin(y/12*PI)+320*Math.sin(y*PI/30))*2/3;return r}
+function tLon(x,y){let r=300+x+2*y+.1*x*x+.1*x*y+.1*Math.sqrt(Math.abs(x));
+  r+=(20*Math.sin(6*x*PI)+20*Math.sin(2*x*PI))*2/3;
+  r+=(20*Math.sin(x*PI)+40*Math.sin(x/3*PI))*2/3;
+  r+=(150*Math.sin(x/12*PI)+300*Math.sin(x/30*PI))*2/3;return r}
+function wgs2gcj(lat,lon){
+  if(outOfChina(lat,lon))return[lat,lon];
+  let dLat=tLat(lon-105,lat-35), dLon=tLon(lon-105,lat-35);
+  const rad=lat/180*PI; let m=Math.sin(rad); m=1-EE*m*m;
+  const sq=Math.sqrt(m);
+  dLat=(dLat*180)/((A*(1-EE))/(m*sq)*PI);
+  dLon=(dLon*180)/(A/sq*Math.cos(rad)*PI);
+  return[lat+dLat,lon+dLon];
+}
+function gcj2wgs(lat,lon){
+  if(outOfChina(lat,lon))return[lat,lon];
+  let wLat=lat,wLon=lon;
+  for(let i=0;i<3;i++){const[g1,g2]=wgs2gcj(wLat,wLon);wLat+=lat-g1;wLon+=lon-g2}
+  return[wLat,wLon];
+}
+
+// ---------- map ----------
+const tiles={
+  osm:L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png',{maxZoom:19,attribution:'© OpenStreetMap'}),
+  sat:L.tileLayer('https://server.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}',{maxZoom:19,attribution:'© Esri'}),
+  gaode:L.tileLayer('https://wprd0{s}.is.autonavi.com/appmaptile?lang=zh_cn&size=1&style=7&x={x}&y={y}&z={z}',{subdomains:'1234',maxZoom:19,attribution:'© 高德'})
+};
+let mode='osm';                      // gaode 图层坐标系是 GCJ-02
+const map=L.map('map',{zoomControl:true}).setView([35.6586,139.7454],13);
+tiles.osm.addTo(map);
+const marker=L.marker([35.6586,139.7454],{draggable:true}).addTo(map);
+
+const $=id=>document.getElementById(id);
+const isGcj=()=>mode==='gaode';
+// 显示坐标 -> 真实 WGS84
+const toWgs=(lat,lon)=>isGcj()?gcj2wgs(lat,lon):[lat,lon];
+// 真实 WGS84 -> 显示坐标
+const toDisp=(lat,lon)=>isGcj()?wgs2gcj(lat,lon):[lat,lon];
+
+function setFromDisplay(lat,lon){
+  const[w1,w2]=toWgs(lat,lon);
+  $('lat').value=w1.toFixed(6); $('lon').value=w2.toFixed(6);
+  marker.setLatLng([lat,lon]);
+}
+function setFromWgs(lat,lon,fly){
+  $('lat').value=(+lat).toFixed(6); $('lon').value=(+lon).toFixed(6);
+  const[d1,d2]=toDisp(+lat,+lon);
+  marker.setLatLng([d1,d2]);
+  if(fly)map.setView([d1,d2],Math.max(map.getZoom(),15));
+}
+map.on('click',e=>setFromDisplay(e.latlng.lat,e.latlng.lng));
+marker.on('dragend',()=>{const p=marker.getLatLng();setFromDisplay(p.lat,p.lng)});
+
+document.querySelectorAll('.layers button').forEach(b=>b.onclick=()=>{
+  const want=b.dataset.layer; if(want===mode)return;
+  const lat=parseFloat($('lat').value),lon=parseFloat($('lon').value);
+  tiles[mode].remove(); mode=want; tiles[mode].addTo(map);
+  document.querySelectorAll('.layers button').forEach(x=>x.classList.toggle('on',x===b));
+  if(Number.isFinite(lat)&&Number.isFinite(lon))setFromWgs(lat,lon,true);
+});
+
+// ---------- device I/O ----------
+const ENDPOINT='https://gs-loc.apple.com/wloc-settings/save';
+const out=(t,cls)=>{$('out').textContent=t; if(cls)$('out').dataset.k=cls};
+function pill(text,cls){const p=$('status');p.textContent=text;p.className='pill'+(cls?' '+cls:'')}
+
+async function call(params){
+  const url=ENDPOINT+'?'+new URLSearchParams(params).toString();
+  const r=await fetch(url,{cache:'no-store'});
+  return r.json();
+}
+async function refresh(quiet){
+  try{
+    const j=await call({action:'query'});
+    if(j.success){
+      pill('模块已生效','ok');
+      out(`当前生效坐标\n纬度 ${j.latitude}\n经度 ${j.longitude}\n精度 ${j.accuracy} m　扰动 ${j.randomRadius??0} m\n更新于 ${j.updatedAt||'—'}`);
+      if(!$('lat').value)setFromWgs(j.latitude,j.longitude,true);
+    }else{
+      pill('模块已生效','ok');
+      out('模块在，但设备里还没有保存过坐标。');
+    }
+  }catch(e){
+    pill('模块未生效','bad');
+    if(!quiet)out('连不上模块。请确认：小火箭代理已开启、wloc 模块已启用、HTTPS 解密已打开且证书已信任。');
+  }
+}
+$('save').onclick=async()=>{
+  const lat=parseFloat($('lat').value),lon=parseFloat($('lon').value);
+  if(!Number.isFinite(lat)||!Number.isFinite(lon))return out('先选一个位置。');
+  out('写入中…');
+  try{
+    const j=await call({action:'save',lat,lon,acc:parseInt($('acc').value||'25',10),randomRadius:parseFloat($('rnd').value||'0')});
+    if(j.success){pill('模块已生效','ok');
+      out(`已写入设备\n纬度 ${j.latitude}\n经度 ${j.longitude}\n精度 ${j.accuracy} m　扰动 ${j.randomRadius??0} m\n\n接下来：关掉定位服务等 10 秒再打开（iOS 26+ 需重启设备）。`);}
+    else out('写入失败：'+(j.error||'未知错误'));
+  }catch(e){pill('模块未生效','bad');out('写入失败，模块没拦到请求。检查代理开关 / 模块启用 / HTTPS 解密 / 证书信任。')}
+};
+$('query').onclick=()=>refresh(false);
+$('clear').onclick=async()=>{
+  out('清除中…');
+  try{const j=await call({action:'clear'});
+    out(j.success?'已清除保存的坐标。关开一次定位服务即可回到真实位置（iOS 26+ 需重启）。':'清除失败：'+(j.error||''))}
+  catch(e){out('清除失败，模块没拦到请求。')}
+};
+
+// ---------- search ----------
+$('go').onclick=async()=>{
+  const q=$('q').value.trim(); if(!q)return;
+  const m=q.match(/^\s*(-?\d+(?:\.\d+)?)\s*[,，\s]\s*(-?\d+(?:\.\d+)?)\s*$/);
+  if(m){setFromWgs(parseFloat(m[1]),parseFloat(m[2]),true);return out('已定位到输入的坐标。')}
+  out('搜索中…');
+  try{
+    const r=await fetch('https://nominatim.openstreetmap.org/search?format=json&limit=1&q='+encodeURIComponent(q));
+    const a=await r.json();
+    if(!a.length)return out('没找到这个地方。');
+    setFromWgs(parseFloat(a[0].lat),parseFloat(a[0].lon),true);
+    out('已定位：'+a[0].display_name);
+  }catch(e){out('搜索失败（网络或 Nominatim 限流）。')}
+};
+$('q').addEventListener('keydown',e=>{if(e.key==='Enter')$('go').click()});
+
+// ---------- favourites ----------
+const KEY='wloc_favs';
+const load=()=>{try{return JSON.parse(localStorage.getItem(KEY))||[]}catch{return[]}};
+const store=v=>{try{localStorage.setItem(KEY,JSON.stringify(v))}catch{}};
+function drawFavs(){
+  const list=load(),box=$('favs');
+  if(!list.length){box.innerHTML='<div class="hint">还没有收藏。选好位置后点「收藏」。</div>';return}
+  box.innerHTML='';
+  list.forEach((f,i)=>{
+    const d=document.createElement('div');d.className='fav';
+    const s=document.createElement('span');s.textContent=`${f.name} (${(+f.lat).toFixed(4)}, ${(+f.lon).toFixed(4)})`;
+    const b1=document.createElement('button');b1.textContent='用';
+    b1.onclick=()=>{setFromWgs(f.lat,f.lon,true);$('acc').value=f.acc||25};
+    const b2=document.createElement('button');b2.textContent='删';
+    b2.onclick=()=>{const l=load();l.splice(i,1);store(l);drawFavs()};
+    d.append(s,b1,b2);box.appendChild(d);
+  });
+}
+$('star').onclick=()=>{
+  const lat=parseFloat($('lat').value),lon=parseFloat($('lon').value);
+  if(!Number.isFinite(lat)||!Number.isFinite(lon))return out('先选一个位置。');
+  const name=prompt('收藏名称','')||`${lat.toFixed(4)},${lon.toFixed(4)}`;
+  const l=load();l.unshift({name,lat,lon,acc:parseInt($('acc').value||'25',10)});store(l);drawFavs();
+};
+
+drawFavs();
+refresh(true);
+</script>
+</body>
+</html>
