@@ -1,21 +1,12 @@
-# wloc (personal mirror)
+# wloc
 
 ![wloc](images/wloc-01.jpg)
 
 **👉 第一次用？直接看 [使用教程（图文版）](使用教程.md)，按步骤操作即可。**
 
-Apple 网络定位（WLOC）坐标修改模块的个人副本。上游作者账号已消失，这里钉一份自己的版本，脚本全部自托管，不依赖任何第三方仓库。
+Apple 网络定位（WLOC）坐标修改模块。脚本全部自托管，不依赖任何第三方仓库。
 
 > **免责**：仅供学习和自有设备测试使用。使用需要在代理工具中开启 HTTPS 解密并信任其根证书，风险自负。
-
-## 来源
-
-| | |
-|---|---|
-| 原作者 / 原项目 | **Yu9191** — `github.com/Yu9191/wloc`（账号已于 2026-09 前后删除，原仓库 404） |
-| 本副本文件取自 | 镜像仓库 `ifflagged/Romeo` 的 `Modules/Surge/Yu9191/`、`Modules/Loon/Yu9191/`、`Modules/JavaScript/Yu9191/wloc/` |
-| 相对上游的改动 | 仅将两条 `script-path` 指向本仓库；删除一行指向已失效图床的 `#!icon` |
-| 教程部分参考 | [@xiaoyuboi 的推文教程](https://x.com/xiaoyuboi/status/2080504555570348292)（步骤经改写，截图版权归原作者） |
 
 ## 订阅地址
 
@@ -76,12 +67,12 @@ flowchart LR
 
 ## 快捷指令
 
-原作者提供了两个 iCloud 快捷指令，用来在地图里分享一下就把坐标写进设备：
+两个 iCloud 快捷指令，用来在地图里分享一下就把坐标写进设备：
 
 - 设置位置：<https://www.icloud.com/shortcuts/a82717d8fdad4e6280866fcf911173f7>
 - 恢复定位：<https://www.icloud.com/shortcuts/f42632d406504f24a2cd163af4fe012f>
 
-> ⚠️ 这两个链接托管在**原作者的 iCloud 账号**下，不在本仓库控制范围内，且 iCloud 分享的快捷指令是可以被所有者更新的。添加前请在「快捷指令」App 里逐条查看动作内容，确认它只是向 `gs-loc.apple.com/wloc-settings/save` 发一个请求。
+> ⚠️ 这两个链接托管在**第三方 iCloud 账号**下，不在本仓库控制范围内，且 iCloud 分享的快捷指令是可以被所有者更新的。添加前请在「快捷指令」App 里逐条查看动作内容，确认它只是向 `gs-loc.apple.com/wloc-settings/save` 发一个请求。
 >
 > 完全可以自己重建，逻辑很简单：取输入的位置 → 取经纬度 → 拼出 `https://gs-loc.apple.com/wloc-settings/save?latitude=<纬度>&longitude=<经度>&accuracy=25` → 用「获取 URL 内容」访问它。恢复版把 `action=clear` 传过去即可。
 
@@ -99,7 +90,7 @@ flowchart LR
 - 收藏常用位置（存在浏览器本地）
 - 地名搜索（直连 OpenStreetMap Nominatim）、坐标文本粘贴
 
-它与设备通信的方式和上游一致：向 `gs-loc.apple.com/wloc-settings/save` 发请求，由 `wloc-settings.js` 在本地拦截。参数说明：
+它与设备通信的方式：向 `gs-loc.apple.com/wloc-settings/save` 发请求，由 `wloc-settings.js` 在本地拦截。参数说明：
 
 | 参数 | 取值 |
 |---|---|
@@ -125,7 +116,3 @@ flowchart LR
 | 实际使用的 API | `$persistentStore`（本地存储读写）、`$done`（返回响应） |
 
 即：脚本本身**不具备联网能力**，不会把坐标发给任何人。
-
-## 致谢
-
-核心实现来自 **Yu9191**。本仓库只是一份自托管副本，未对脚本逻辑做任何修改。
