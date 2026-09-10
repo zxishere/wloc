@@ -45,6 +45,7 @@ button:active{opacity:.7}
 .fav:last-child{border-bottom:none}
 .fav span{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:14px}
 .fav button{width:auto;flex:none;padding:6px 10px;font-size:12px}
+.dev-pop{font-size:13px;line-height:1.5}
 </style>
 </head>
 <body>
@@ -79,6 +80,14 @@ button:active{opacity:.7}
       <button class="danger" id="clear">恢复真实定位</button>
     </div>
     <div class="out" id="out">点地图选点，或直接填经纬度。</div>
+  </div>
+
+  <div class="card">
+    <h2>设备当前定位</h2>
+    <div class="row">
+      <button id="locate">读取设备定位（并催一次刷新）</button>
+    </div>
+    <div class="out" id="devout">点上面按钮，看 iPhone 此刻认为自己在哪。和目标点差几十米以内 = 已生效。</div>
   </div>
 
   <div class="card">
@@ -256,7 +265,47 @@ $('star').onclick=()=>{
   const l=load();l.unshift({name,lat,lon,acc:parseInt($('acc').value||'25',10)});store(l);drawFavs();
 };
 
-// ---------- URL 参数（供快捷指令调用）----------
+// ---------- 设备当前定位 ----------
+const devout=t=>{$('devout').textContent=t};
+let devMarker=null;
+function haversine(lat1,lon1,lat2,lon2){
+  const R=6371000,toR=x=>x*PI/180;
+  const dLat=toR(lat2-lat1),dLon=toR(lon2-lon1);
+  const a=Math.sin(dLat/2)**2+Math.cos(toR(lat1))*Math.cos(toR(lat2))*Math.sin(dLon/2)**2;
+  return 2*R*Math.asin(Math.sqrt(a));
+}
+const fmtDist=m=>m<1000?Math.round(m)+' m':(m/1000).toFixed(m<10000?2:0)+' km';
+$('locate').onclick=()=>{
+  if(!navigator.geolocation)return devout('此浏览器不支持定位。');
+  devout('定位中…（首次会弹出位置权限，请允许）');
+  navigator.geolocation.getCurrentPosition(p=>{
+    const {latitude:dl,longitude:dn,accuracy:da}=p.coords;
+    const [x,y]=toDisp(dl,dn);
+    if(devMarker)devMarker.remove();
+    devMarker=L.circleMarker([x,y],{radius:9,color:'#fff',weight:2,fillColor:'#d92c20',fillOpacity:.95}).addTo(map)
+      .bindPopup('<div class="dev-pop"><b>设备当前定位</b><br>'+dl.toFixed(6)+', '+dn.toFixed(6)+'<br>精度 '+Math.round(da)+' m</div>');
+    const tl=parseFloat($('lat').value),tn=parseFloat($('lon').value);
+    let msg='设备当前定位\n纬度 '+dl.toFixed(6)+'\n经度 '+dn.toFixed(6)+'\n定位精度 '+Math.round(da)+' m';
+    if(Number.isFinite(tl)&&Number.isFinite(tn)){
+      const d=haversine(dl,dn,tl,tn);
+      msg+='\n\n与目标点相距 '+fmtDist(d);
+      if(d<=Math.max(150,da*2))msg+='\n✅ 已生效';
+      else if(d<2000)msg+='\n⚠️ 接近但有偏差，可能是 GPS 在起作用，室内再试';
+      else msg+='\n❌ 未生效。去「设置 → 隐私与安全性 → 定位服务」关 10 秒再开；iOS 26+ 需重启设备。';
+      const grp=L.featureGroup([marker,devMarker]);
+      map.fitBounds(grp.getBounds().pad(0.4),{maxZoom:16});
+    }else{
+      map.setView([x,y],15);
+      msg+='\n\n（还没设目标点，无法比较）';
+    }
+    devout(msg);
+  },e=>{
+    const why={1:'你拒绝了位置权限。到「设置 → Safari → 位置」或「设置 → 隐私与安全性 → 定位服务 → Safari 网站」里改为允许。',2:'系统拿不到位置，定位服务可能是关着的。',3:'定位超时，再点一次。'}[e.code]||e.message;
+    devout('读取失败：'+why);
+  },{enableHighAccuracy:true,maximumAge:0,timeout:15000});
+};
+
+// ---------- URL 参数（供外部链接调用）----------
 // 例: /?lat=35.6586&lon=139.7454        仅定位到该点，手动点「储存到设备」
 //     /?lat=..&lon=..&auto=1            定位并自动写入设备
 //     /?lat=..&lon=..&gcj=1&auto=1      输入为 GCJ-02（高德/国内苹果地图），先转 WGS-84 再写入
