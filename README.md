@@ -10,17 +10,12 @@ Apple 网络定位（WLOC）坐标修改模块。脚本全部自托管，不依�
 
 ## 订阅地址
 
-**Surge / Shadowrocket / Stash**
+| Surge / Shadowrocket / Stash | Loon |
+|---|---|
+| `https://raw.githubusercontent.com/zxishere/wloc/main/wloc.sgmodule` | `https://raw.githubusercontent.com/zxishere/wloc/main/wloc.lpx` |
+| ![](images/qr-module.png) | ![](images/qr-loon.png) |
 
-```
-https://raw.githubusercontent.com/zxishere/wloc/main/wloc.sgmodule
-```
-
-**Loon**
-
-```
-https://raw.githubusercontent.com/zxishere/wloc/main/wloc.lpx
-```
+新手机直接用相机扫码即可打开链接。
 
 ## 原理
 
@@ -47,34 +42,26 @@ sequenceDiagram
 
 ## 坐标从哪来
 
-三种写法，写进的是同一份设备本地存储，优先级如下：
+两种写法，写进的是同一份设备本地存储，优先级如下：
 
 ```mermaid
 flowchart LR
     A["模块参数<br/>(手填经纬度)"] --> D{wloc.js<br/>取哪个}
-    B["快捷指令<br/>(地图分享)"] --> C["$persistentStore<br/>设备本地存储"]
-    E["选点网页<br/>(点地图)"] --> C
+    E["选点网页<br/>(点地图)"] --> C["$persistentStore<br/>设备本地存储"]
     C --> D
     D -->|存储里有值| F["用存储的坐标"]
     D -->|存储为空| G["用模块参数默认值"]
 ```
 
-后两种是通过向 `gs-loc.apple.com/wloc-settings/save` 发请求写入的——这条请求根本到不了苹果，会被 `wloc-settings.js` 在**本地**截住。**坐标不出设备。**
+选点网页是通过向 `gs-loc.apple.com/wloc-settings/save` 发请求写入的——这条请求根本到不了苹果，会被 `wloc-settings.js` 在**本地**截住。**坐标不出设备。**
 
 ## 使用教程
 
-完整的分步图文教程见 **[使用教程.md](使用教程.md)**：导入模块 → HTTPS 解密与证书 → 描述文件与信任 → 设置坐标 → 刷新定位 → 恢复。排错表也在那里。
+完整的分步图文教程见 **[使用教程.md](使用教程.md)**：导入模块 → HTTPS 解密与证书 → 描述文件与信任 → 选点写入 → 刷新定位 → 恢复。排错表也在那里。
 
-## 快捷指令
+![](images/qr-repo.png)
 
-两个 iCloud 快捷指令，用来在地图里分享一下就把坐标写进设备：
-
-- 设置位置：<https://www.icloud.com/shortcuts/a82717d8fdad4e6280866fcf911173f7>
-- 恢复定位：<https://www.icloud.com/shortcuts/f42632d406504f24a2cd163af4fe012f>
-
-> ⚠️ 这两个链接托管在**第三方 iCloud 账号**下，不在本仓库控制范围内，且 iCloud 分享的快捷指令是可以被所有者更新的。添加前请在「快捷指令」App 里逐条查看动作内容，确认它只是向 `gs-loc.apple.com/wloc-settings/save` 发一个请求。
->
-> 完全可以自己重建，逻辑很简单：取输入的位置 → 取经纬度 → 拼出 `https://gs-loc.apple.com/wloc-settings/save?latitude=<纬度>&longitude=<经度>&accuracy=25` → 用「获取 URL 内容」访问它。恢复版把 `action=clear` 传过去即可。
+扫码打开本仓库。
 
 ## 自建选点页
 
@@ -82,13 +69,17 @@ flowchart LR
 
 **<https://zxishere.github.io/wloc/>**
 
+![](images/qr-picker.png)
+
 它是一个单文件静态页，没有任何后端。功能：
 
 - 点地图或拖图钉选点，支持标准 / 卫星 / 高德三种底图（高德底图自动做 GCJ-02 ↔ WGS-84 转换）
 - 手填经纬度、精度、扰动半径
 - 「储存到设备」写入坐标，「查询当前」读回当前生效值，「恢复真实定位」清空
+- 「读取设备定位」读出 iPhone 此刻认为自己在哪、与目标点相距多少，不用切去地图就能验证是否生效
 - 收藏常用位置（存在浏览器本地）
 - 地名搜索（直连 OpenStreetMap Nominatim）、坐标文本粘贴
+- 支持 URL 参数直接打开：`/?lat=..&lon=..&auto=1` 定位并写入，`/?action=clear` 恢复
 
 它与设备通信的方式：向 `gs-loc.apple.com/wloc-settings/save` 发请求，由 `wloc-settings.js` 在本地拦截。参数说明：
 
