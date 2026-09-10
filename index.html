@@ -256,6 +256,25 @@ $('star').onclick=()=>{
   const l=load();l.unshift({name,lat,lon,acc:parseInt($('acc').value||'25',10)});store(l);drawFavs();
 };
 
+// ---------- URL 参数（供快捷指令调用）----------
+// 例: /?lat=35.6586&lon=139.7454        仅定位到该点，手动点「储存到设备」
+//     /?lat=..&lon=..&auto=1            定位并自动写入设备
+//     /?lat=..&lon=..&gcj=1&auto=1      输入为 GCJ-02（高德/国内苹果地图），先转 WGS-84 再写入
+//     /?action=clear                    清除坐标（恢复真实定位）
+(async()=>{
+  const q=new URLSearchParams(location.search);
+  const la=parseFloat(q.get('lat')||q.get('latitude')), lo=parseFloat(q.get('lon')||q.get('lng')||q.get('longitude'));
+  if(q.get('acc'))$('acc').value=q.get('acc');
+  if(q.get('action')==='clear'){ $('clear').click(); return; }
+  if(Number.isFinite(la)&&Number.isFinite(lo)){
+    let lat=la,lon=lo;
+    if(q.get('gcj')==='1'){ [lat,lon]=gcj2wgs(la,lo); }
+    setFromWgs(lat,lon,true);
+    if(q.get('auto')==='1'){ await new Promise(r=>setTimeout(r,300)); $('save').click(); }
+    else out('已从链接载入坐标，确认后点「储存到设备」。');
+  }
+})();
+
 drawFavs();
 refresh(true);
 </script>
